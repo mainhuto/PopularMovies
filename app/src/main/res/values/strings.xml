@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">PopularMovies</string>
+    <string name="tmdb_query_base_url">https://api.themoviedb.org/3/movie</string>
+    <string name="tmdb_image_base_url">https://image.tmdb.org/t/p/</string>
+    <!--//TODO To test write a valid API key-->
+    <string name="tmdb_api_key">To test write a valid API key here</string>
+    <string name="most_popular">Most popular</string>
+    <string name="highest_rated">Highest rated</string>
+    <string name="saved_sort_by_key">sort_by</string>
+    <string name="bundle_movies_key">movies</string>
+    <string name="movie_thumbnail_description">Movie thumbnail image</string>
+    <string name="extra_selected_movie">selected_movie</string>
+    <string name="no_connection_message">Could not retrieve data from Internet. Please, tap the screen to try again.</string>
+</resources>
