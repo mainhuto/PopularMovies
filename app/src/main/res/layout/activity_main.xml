@@ -7,6 +7,7 @@
     <android.support.v7.widget.RecyclerView
         android:id="@+id/movies_rv"
         android:layout_width="match_parent"
+        android:visibility="visible"
         android:layout_height="match_parent" />
 
     <ProgressBar
@@ -23,7 +24,77 @@
         android:visibility="invisible"
         android:layout_margin="16dp"
         android:text="@string/no_connection_message"
-        android:textSize="22sp"  />
+        android:textSize="18sp"  />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="invisible"
+        android:id="@+id/no_favorites_tv"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="16dp"
+            android:text="@string/no_favorites_message"
+            android:textSize="18sp"  />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_horizontal"
+            android:orientation="horizontal"
+            android:padding="16dp">
+
+
+            <ImageView
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="32dp"
+                android:layout_marginLeft="32dp"
+                android:layout_marginEnd="32dp"
+                android:layout_marginRight="32dp"
+                android:background="@drawable/ic_favorite_off"
+                android:contentDescription="@string/star_off_description"
+                android:foregroundGravity="left" />
+
+
+            <ImageView
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="32dp"
+                android:layout_marginLeft="32dp"
+                android:layout_marginEnd="32dp"
+                android:layout_marginRight="32dp"
+                android:background="@drawable/ic_favorite_on"
+                android:contentDescription="@string/star_on_description"
+                android:foregroundGravity="left" />
+
+
+        </LinearLayout>
+
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_horizontal"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="48dp"
+                android:text="@string/no_favorite_label" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/favorite_label" />
+
+        </LinearLayout>
+
+    </LinearLayout>
 
 </merge>
 

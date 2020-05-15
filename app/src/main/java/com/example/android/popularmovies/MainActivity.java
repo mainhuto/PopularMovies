@@ -1,15 +1,21 @@
 package com.example.android.popularmovies;
 
+import android.arch.lifecycle.Observer;
+import android.arch.lifecycle.ViewModelProviders;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.res.Configuration;
-import android.os.AsyncTask;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
+import android.support.v4.app.LoaderManager;
+import android.support.v4.content.Loader;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.text.TextUtils;
+import android.util.DisplayMetrics;
+import android.view.Display;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -17,25 +23,26 @@ import android.view.View;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
+import com.example.android.popularmovies.database.FavMovieEntry;
 import com.example.android.popularmovies.model.Movie;
+import com.example.android.popularmovies.utils.AppAsyncHttpLoader;
 import com.example.android.popularmovies.utils.TMDBUtil;
-import com.example.android.popularmovies.utils.NetworkUtil;
 
-import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.List;
 
-public class MainActivity extends AppCompatActivity implements MovieAdapter.MovieAdapterOnClickHandler, View.OnClickListener {
+public class MainActivity extends AppCompatActivity implements MovieAdapter.MovieAdapterOnClickHandler
+        , View.OnClickListener, LoaderManager.LoaderCallbacks<List<String>>, AppAsyncHttpLoader.LoaderListener {
 
-    private ArrayList<Movie> movies;
     private RecyclerView mMoviesRecyclerView;
     private ProgressBar mProgressBar;
     private TextView mNoConnectionTextView;
+    private View mNoFavoritesLayout;
     private MovieAdapter movieAdapter;
     private String queryBaseUrl;
     private String apiKey;
     private TMDBUtil.SortBy sortBy;
-
 
 
     @Override
@@ -44,20 +51,17 @@ public class MainActivity extends AppCompatActivity implements MovieAdapter.Movi
         setContentView(R.layout.activity_main);
 
         queryBaseUrl = getResources().getString(R.string.tmdb_query_base_url);
-        apiKey = getResources().getString(R.string.tmdb_api_key);
+        apiKey = BuildConfig.TMDB_API_KEY;
         mMoviesRecyclerView = (RecyclerView) findViewById(R.id.movies_rv);
         mProgressBar = (ProgressBar) findViewById(R.id.progress_pb);
         mNoConnectionTextView = (TextView) findViewById(R.id.no_connection_tv);
+        mNoFavoritesLayout = (View) findViewById(R.id.no_favorites_tv);
         mNoConnectionTextView.setOnClickListener(this);
 
         retrievePreferences();
 
-        int spanCount;
-        if(getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE){
-            spanCount = 3;
-        } else {
-            spanCount = 2;
-        }
+        int posterWidth = (int)getResources().getDimension(R.dimen.poster_width);
+        int spanCount = calculateBestSpanCount(posterWidth);
 
         GridLayoutManager layoutManager = new GridLayoutManager(getApplicationContext(), spanCount);
         mMoviesRecyclerView.setLayoutManager(layoutManager);
@@ -65,11 +69,13 @@ public class MainActivity extends AppCompatActivity implements MovieAdapter.Movi
         mMoviesRecyclerView.setAdapter(movieAdapter);
 
         if ( (savedInstanceState != null) && savedInstanceState.containsKey(getResources().getString(R.string.bundle_movies_key)) ) {
-            movies = savedInstanceState.getParcelableArrayList(getResources().getString(R.string.bundle_movies_key));
+            ArrayList<Movie> movies = savedInstanceState.getParcelableArrayList(getResources().getString(R.string.bundle_movies_key));
             movieAdapter.setMovies(movies);
         } else {
             fetchMoviesData();
         }
+
+        setupViewModel();
 
     }
 
@@ -84,6 +90,9 @@ public class MainActivity extends AppCompatActivity implements MovieAdapter.Movi
                 break;
             case HIGHEST_RATED:
                 item = menu.findItem(R.id.highest_rated_sort);
+                break;
+            case FAVORITES:
+                item = menu.findItem(R.id.favorites);
                 break;
             default:
                 item = menu.findItem(R.id.most_popular_sort);
@@ -103,35 +112,84 @@ public class MainActivity extends AppCompatActivity implements MovieAdapter.Movi
             case R.id.highest_rated_sort:
                 changeSortBy(TMDBUtil.SortBy.HIGHEST_RATED);
                 return true;
+            case R.id.favorites:
+                changeSortBy(TMDBUtil.SortBy.FAVORITES);
+                return true;
         }
         return false;
     }
 
-
     @Override
     protected void onSaveInstanceState(Bundle outState) {
+        ArrayList<Movie> movies = (ArrayList<Movie>) movieAdapter.getMovies();
         if ( ( movies != null ) && movies.size() > 0 ) {
             outState.putParcelableArrayList(getString(R.string.bundle_movies_key), movies);
         }
         super.onSaveInstanceState(outState);
     }
 
+    private void setupViewModel() {
+        MainViewModel viewModel = ViewModelProviders.of(this).get(MainViewModel.class);
+        viewModel.geFavMovies().observe(this, new Observer<List<FavMovieEntry>>() {
+            @Override
+            public void onChanged(@Nullable List<FavMovieEntry> favMovieEntries) {
+                if (TMDBUtil.SortBy.FAVORITES.equals(sortBy)) {
+                    loadMovies(favMovieEntries);
+                }
+            }
+        });
+    }
+
     private void fetchMoviesData() {
-        movies = new ArrayList<>();
-        URL url = TMDBUtil.buildUrl(queryBaseUrl, sortBy, apiKey);
-        if ( url != null ) {
-            mMoviesRecyclerView.setVisibility(View.INVISIBLE);
-            mNoConnectionTextView.setVisibility(View.INVISIBLE);
-            FetchDataFromTMDB fetchDataFromTMDB = new FetchDataFromTMDB();
-            fetchDataFromTMDB.execute(url);
+        if (!TMDBUtil.SortBy.FAVORITES.equals(sortBy)) {
+            movieAdapter.setMovies(new ArrayList<Movie>());
+            URL url = TMDBUtil.buildUrl(queryBaseUrl, sortBy, apiKey);
+            if ( url != null ) {
+                hideViews();
+                Bundle queryBundle = new Bundle();
+                queryBundle.putString(AppAsyncHttpLoader.SEARCH_QUERY_URL_1_EXTRA, url.toString());
+                getSupportLoaderManager().restartLoader(sortBy.getLoaderId(), queryBundle, this);
+            } else {
+                showNoConnectionMessage();
+            }
+        }
+    }
+
+    private void hideViews() {
+        mMoviesRecyclerView.setVisibility(View.INVISIBLE);
+        mNoFavoritesLayout.setVisibility(View.INVISIBLE);
+        mNoConnectionTextView.setVisibility(View.INVISIBLE);
+    }
+
+    private void loadMovies(List<FavMovieEntry> movieEntryList) {
+        if ( ( movieEntryList != null ) && movieEntryList.size() > 0 ) {
+            ArrayList<Movie> movies = new ArrayList<>();
+            for (FavMovieEntry favMovieEntry: movieEntryList) {
+                Movie movie = new Movie(
+                        favMovieEntry.getTitle(),
+                        favMovieEntry.getImagePath(),
+                        favMovieEntry.getPlotSynopsis(),
+                        favMovieEntry.getUserRating(),
+                        favMovieEntry.getReleaseDate().getTime(),
+                        favMovieEntry.getTmdbMovieId()
+                );
+                movie.setFavMovieId(favMovieEntry.getId());
+                movies.add(movie);
+            }
+            if ( movies.size() > 0 ) {
+                mMoviesRecyclerView.setVisibility(View.VISIBLE);
+                movieAdapter.setMovies(movies);
+            } else {
+                showNoFavoritesMessage();
+            }
         } else {
-            showNoConnectionMessage();
+            showNoFavoritesMessage();
         }
     }
 
     private void loadMovies(String fetchedData) {
         if ( !TextUtils.isEmpty(fetchedData) ) {
-            movies = TMDBUtil.createMovieList(fetchedData);
+            ArrayList<Movie> movies = TMDBUtil.createMovieList(fetchedData);
             if ( movies.size() > 0 ) {
                 movieAdapter.setMovies(movies);
             } else {
@@ -144,13 +202,25 @@ public class MainActivity extends AppCompatActivity implements MovieAdapter.Movi
 
     private void showNoConnectionMessage() {
         mNoConnectionTextView.setVisibility(View.VISIBLE);
+        mNoFavoritesLayout.setVisibility(View.INVISIBLE);
+        mMoviesRecyclerView.setVisibility(View.INVISIBLE);
+    }
+
+    private void showNoFavoritesMessage() {
+        mNoFavoritesLayout.setVisibility(View.VISIBLE);
+        mNoConnectionTextView.setVisibility(View.INVISIBLE);
         mMoviesRecyclerView.setVisibility(View.INVISIBLE);
     }
 
     @Override
     public void onClick(Movie movie) {
+        boolean fromFavoriteList = false;
+        if (TMDBUtil.SortBy.FAVORITES.equals(sortBy)) {
+            fromFavoriteList = true;
+        }
         Intent intent = new Intent(this, DetailActivity.class);
         intent.putExtra(getString(R.string.extra_selected_movie), movie);
+        intent.putExtra(getString(R.string.extra_from_favorite), fromFavoriteList);
         startActivity(intent);
     }
 
@@ -159,33 +229,33 @@ public class MainActivity extends AppCompatActivity implements MovieAdapter.Movi
         fetchMoviesData();
     }
 
-    class FetchDataFromTMDB extends AsyncTask<URL, Void, String> {
+    @NonNull
+    @Override
+    public Loader<List<String>> onCreateLoader(int i, @Nullable Bundle bundle) {
+        return new AppAsyncHttpLoader(this, bundle);
+    }
 
-        @Override
-        protected void onPreExecute() {
-            mProgressBar.setVisibility(View.VISIBLE);
-        }
-
-        @Override
-        protected String doInBackground(URL... urls) {
-            String fetchedData = null;
-            if ( urls.length == 1 ) {
-                URL url = urls[0];
-                try {
-                    fetchedData = NetworkUtil.getResponseFromHttpUrl(url);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-            return fetchedData;
-        }
-
-        @Override
-        protected void onPostExecute(String fetchedData) {
+    @Override
+    public void onLoadFinished(@NonNull Loader<List<String>> loader, List<String> data) {
+        if (loader.getId() == sortBy.getLoaderId()) {
             mProgressBar.setVisibility(View.INVISIBLE);
-            mMoviesRecyclerView.setVisibility(View.VISIBLE);
-            loadMovies(fetchedData);
+            if ( ( data != null) && ( data.size() > 0 ) ) {
+                mMoviesRecyclerView.setVisibility(View.VISIBLE);
+                loadMovies(data.get(0));
+            } else {
+                showNoConnectionMessage();
+            }
         }
+    }
+
+    @Override
+    public void onLoaderReset(@NonNull Loader<List<String>> loader) {
+
+    }
+
+    @Override
+    public void onForceLoad() {
+        mProgressBar.setVisibility(View.VISIBLE);
     }
 
     private void retrievePreferences() {
@@ -210,9 +280,23 @@ public class MainActivity extends AppCompatActivity implements MovieAdapter.Movi
         if (!sortBy.equals(newSortBy)) {
             sortBy = newSortBy;
             savePreferences();
-            fetchMoviesData();
+            if (TMDBUtil.SortBy.FAVORITES.equals(sortBy)) {
+                mProgressBar.setVisibility(View.INVISIBLE);
+                mNoConnectionTextView.setVisibility(View.INVISIBLE);
+                setupViewModel();
+            } else {
+                fetchMoviesData();
+            }
             mMoviesRecyclerView.scrollToPosition(0);
         }
+    }
+
+    private int calculateBestSpanCount(int posterWidth) {
+        Display display = getWindowManager().getDefaultDisplay();
+        DisplayMetrics outMetrics = new DisplayMetrics();
+        display.getMetrics(outMetrics);
+        float screenWidth = outMetrics.widthPixels;
+        return Math.round(screenWidth / posterWidth);
     }
 
 }

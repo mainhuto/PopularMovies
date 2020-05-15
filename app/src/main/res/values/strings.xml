@@ -2,13 +2,23 @@
     <string name="app_name">PopularMovies</string>
     <string name="tmdb_query_base_url">https://api.themoviedb.org/3/movie</string>
     <string name="tmdb_image_base_url">https://image.tmdb.org/t/p/</string>
-    <!--//TODO To test write a valid API key-->
-    <string name="tmdb_api_key">To test write a valid API key here</string>
     <string name="most_popular">Most popular</string>
     <string name="highest_rated">Highest rated</string>
+    <string name="favorites">Favorites</string>
     <string name="saved_sort_by_key">sort_by</string>
     <string name="bundle_movies_key">movies</string>
     <string name="movie_thumbnail_description">Movie thumbnail image</string>
+    <string name="star_off_description">Star off image</string>
+    <string name="star_on_description">Star on image</string>
+    <string name="star_image_description">Star image to mark a movie as favorite</string>
+    <string name="play_image_description">Play image</string>
     <string name="extra_selected_movie">selected_movie</string>
+    <string name="extra_from_favorite">from_favorite_list</string>
     <string name="no_connection_message">Could not retrieve data from Internet. Please, tap the screen to try again.</string>
+    <string name="no_favorites_message">You have not added any favorite movie. You can do that on the detail movie screen by tapping on the grey star.</string>
+    <string name="item_header_trailers_label">Trailers:</string>
+    <string name="item_header_reviews_label">Reviews:</string>
+    <string name="no_favorite_label">No favorite</string>
+    <string name="favorite_label">Favorite</string>
+    <string name="need_app_to_watch_trailer_text">You need youtube or a web browser to watch the trailer</string>
 </resources>

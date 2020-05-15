@@ -8,5 +8,8 @@
         <item
             android:id="@+id/highest_rated_sort"
             android:title="@string/highest_rated" />
+        <item
+            android:id="@+id/favorites"
+            android:title="@string/favorites" />
     </group>
 </menu>
